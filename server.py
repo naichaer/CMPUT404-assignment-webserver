@@ -1,39 +1,53 @@
-#  coding: utf-8 
+import os
 import SocketServer
 
-# Copyright 2013 Abram Hindle, Eddie Antonio Santos
-# 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-#
-# Furthermore it is derived from the Python documentation examples thus
-# some of the code is Copyright © 2001-2013 Python Software
-# Foundation; All Rights Reserved
-#
-# http://docs.python.org/2/library/socketserver.html
-#
-# run: python freetests.py
-
-# try: curl -v -X GET http://127.0.0.1:8080/
-
-
 class MyWebServer(SocketServer.BaseRequestHandler):
-    
+  
     def handle(self):
-        self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall("OK")
 
+        self.data = self.request.recv(1024).strip()
+        print ("Got a request of: %s\n" % self.data)	
+	#split request to find out method and part of path
+	lines = self.data.splitlines()
+	splitedLines= lines[0].split()
+	method = splitedLines[0]
+	direc = splitedLines[1]	 
+	
+	if method=="GET":
+	    #direct path under folder www
+	    path = os.path.abspath("www" + direc)
+
+	    if os.path.isfile(path):
+		#if path points to a file, get content type and send request
+		mytype = path.split(".")[-1]
+		if(mytype == "css" or mytype == "html"):
+			content = open(path).read()
+			self.setHeader("200 OK","text/"+mytype ,content)    
+		else:
+			self.setHeader("404 Not Found","text/plain","")
+
+	    elif os.path.isdir(path):
+		#if path points to a directory, redirects to index.html
+		path = path + "/index.html"
+		content = open(path).read()
+		if os.path.isfile(path):
+		    self.setHeader("200 OK","text/html",content)
+
+	    else:
+		#path can't be handled, report error
+		self.setHeader("404 Not Found","text/plain","")
+
+	else:	
+	    #only method "GET" is allowed
+	    self.setHeader("405 Method Not Allowed","text/plain","")
+	
+    def setHeader(self,status,mytype,content):
+        response = "HTTP/1.1 "+status+"\r\n"+\
+	            "Content-Type: "+mytype+";charset=UTF-8\r\n\r\n"+ \
+	            content+"\r\n"
+	self.request.sendall(response)
+        return
+    
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
 
